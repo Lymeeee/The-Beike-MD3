@@ -42,8 +42,8 @@ dependencies:
   ustb_sso: ^1.1.0
   crypto: ^3.0.7
   fl_chart: ^1.2.0
-  package_info_plus: ^9.0.1
-  device_info_plus: ^12.4.0
+  package_info_plus: ^10.1.0
+  device_info_plus: ^13.1.0
   markdown_widget: ^2.3.2+8
   url_launcher: ^6.3.2
   dio_cookie_manager: ^3.4.0
