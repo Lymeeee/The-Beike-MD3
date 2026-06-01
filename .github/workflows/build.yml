@@ -53,6 +53,8 @@ jobs:
           echo dist_apk_name=${{ env.APP_NAME }}-${tag_name}-Android.apk | tee -a $GITHUB_OUTPUT
           echo dist_exe_name=${{ env.APP_NAME }}-${tag_name}-Windows.exe | tee -a $GITHUB_OUTPUT
           echo dist_tar_name=${{ env.APP_NAME }}-${tag_name}-Linux.tar.gz | tee -a $GITHUB_OUTPUT
+          echo dist_ios_name=${{ env.APP_NAME }}-${tag_name}-iOS.zip | tee -a $GITHUB_OUTPUT
+          echo dist_mac_name=${{ env.APP_NAME }}-${tag_name}-macOS.zip | tee -a $GITHUB_OUTPUT
 
     outputs:
       tag_name: ${{ steps.get_info.outputs.tag_name }}
@@ -61,6 +63,8 @@ jobs:
       dist_apk_name: ${{ steps.get_info.outputs.dist_apk_name }}
       dist_exe_name: ${{ steps.get_info.outputs.dist_exe_name }}
       dist_tar_name: ${{ steps.get_info.outputs.dist_tar_name }}
+      dist_ios_name: ${{ steps.get_info.outputs.dist_ios_name }}
+      dist_mac_name: ${{ steps.get_info.outputs.dist_mac_name }}
 
   build_android:
     needs: meta
@@ -204,8 +208,85 @@ jobs:
           name: ${{ needs.meta.outputs.dist_tar_name }}
           path: dist/${{ needs.meta.outputs.dist_tar_name }}
 
+  build_ios:
+    needs: meta
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Cache pub deps
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: build_ios-pub-${{ hashFiles('pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Get pub deps
+        run: flutter pub get
+
+      - name: Build iOS
+        run: flutter build ios --release --no-codesign
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cd build/ios/iphoneos
+          zip -r ../../../dist/${{ needs.meta.outputs.dist_ios_name }} Runner.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ needs.meta.outputs.dist_ios_name }}
+          path: dist/${{ needs.meta.outputs.dist_ios_name }}
+
+  build_macos:
+    needs: meta
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Cache pub deps
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: build_macos-pub-${{ hashFiles('pubspec.yaml') }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Get pub deps
+        run: flutter pub get
+
+      - name: Build macOS
+        run: flutter build macos --release
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          APP_NAME=$(find build/macos/Build/Products/Release -name "*.app" -maxdepth 1 | head -1)
+          cd build/macos/Build/Products/Release
+          zip -r ../../../../../dist/${{ needs.meta.outputs.dist_mac_name }} "$(basename "$APP_NAME")"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ needs.meta.outputs.dist_mac_name }}
+          path: dist/${{ needs.meta.outputs.dist_mac_name }}
+
   release:
-    needs: [meta, build_android, build_windows, build_linux]
+    needs: [meta, build_android, build_windows, build_linux, build_ios, build_macos]
     runs-on: ubuntu-latest
     if: ${{ needs.meta.outputs.is_release == 'true' }}
 
